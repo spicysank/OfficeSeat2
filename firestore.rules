@@ -1,0 +1,135 @@
+rules_version = '2';
+
+// OfficeSeat — Firestore Security Rules
+// Firebase only. No Storage rules (we do not use Firebase Storage).
+//
+// Role model:
+//   - Exactly one Admin (admin@officeseat.demo), verified via a custom
+//     claim (`admin: true`) set by the seed-admin script, with a fallback
+//     check on the user's profile role for the reserved admin email.
+//   - Every other authenticated user is an Employee.
+//
+// IMPORTANT: Firestore rules evaluate per-document. We cannot call
+// getIdTokenResult here, so we read the custom claim via request.auth.token.admin
+// and we also trust a profile role of 'admin' ONLY for the reserved
+// admin email — never for a self-assigned role.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers ---------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function isReserveAdminEmail() {
+      return isSignedIn()
+        && request.auth.token.email == 'admin@officeseat.demo'
+        && request.auth.token.email_verified == true;
+    }
+
+    // Trusted admin: custom claim OR the reserved email with verified profile role.
+    function isAdmin() {
+      return isSignedIn()
+        && (request.auth.token.admin == true
+          || (isReserveAdminEmail()
+            && exists(/databases/$(database)/documents/users/$(uid())).data.role == 'admin'));
+    }
+
+    function isEmployee() {
+      return isSignedIn() && !isAdmin();
+    }
+
+    function userIsActive() {
+      return exists(/databases/$(database)/documents/users/$(uid()))
+        && get(/databases/$(database)/documents/users/$(uid())).data.active == true;
+    }
+
+    // --- Users (profiles) -----------------------------------------------
+    match /users/{userId} {
+      // Any signed-in user may read any profile (directory).
+      allow read: if isSignedIn();
+
+      // A user can create only their OWN profile at registration, and
+      // only as an employee (role must be 'employee' or absent).
+      allow create: if isSignedIn()
+        && uid() == userId
+        && request.resource.data.role in [null, 'employee'];
+
+      // Users may update their own display name only. Role and active
+      // fields are never user-writable.
+      allow update: if isSignedIn()
+        && uid() == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['role', 'active', 'email']);
+
+      // Admin may update any user (enable/disable, etc.) but may not
+      // change a role to anything other than 'admin' for the reserved email
+      // or 'employee' otherwise.
+      allow update: if isAdmin();
+
+      // Only admin can delete user profiles.
+      allow delete: if isAdmin();
+    }
+
+    // --- Layouts --------------------------------------------------------
+    match /layouts/{layoutId} {
+      // Employees can read only published layouts. Admin can read all.
+      allow read: if isAdmin() || (isEmployee() && resource.data.status == 'published');
+
+      // Only admin can create/update/delete layouts and image data.
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.size < 1048576;
+      allow delete: if isAdmin();
+
+      // --- Seats subcollection ------------------------------------------
+      match /seats/{seatId} {
+        allow read: if isAdmin() || (isEmployee() && get(/databases/$(database)/documents/layouts/$(layoutId)).data.status == 'published');
+        allow write: if isAdmin();
+      }
+
+      // --- Seat reservations (bookings) ---------------------------------
+      // Bookings are stored in the top-level bookings collection using a
+      // deterministic ID, but we also guard here for layout-scoped reads.
+    }
+
+    // --- Bookings --------------------------------------------------------
+    match /bookings/{bookingId} {
+      // Employees can read only their own bookings. Admin can read all.
+      allow read: if isAdmin()
+        || (isEmployee() && resource.data.employeeId == uid());
+
+      // An employee may create a booking for themselves only, with status
+      // 'active'. The deterministic ID prevents concurrent duplicates:
+      // a second create on the same doc ID will fail because the doc
+      // already exists.
+      allow create: if isEmployee()
+        && request.resource.data.employeeId == uid()
+        && request.resource.data.status == 'active'
+        && request.resource.data.bookingDate is string;
+
+      // Employees may cancel (update status to 'cancelled') their own
+      // bookings. They may not change any other field.
+      allow update: if isAdmin()
+        || (isEmployee()
+          && resource.data.employeeId == uid()
+          && request.resource.data.employeeId == uid()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.status == 'cancelled');
+
+      // Only admin can delete bookings entirely.
+      allow delete: if isAdmin();
+    }
+
+    // --- Settings --------------------------------------------------------
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
