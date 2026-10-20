@@ -47,7 +47,7 @@ export async function listLayouts(): Promise<OfficeLayout[]> {
   return snap.docs.map((d) => serializeLayout(d.id, d.data()));
 }
 
-/*export async function listPublishedLayouts(): Promise<OfficeLayout[]> {
+export async function listPublishedLayouts(): Promise<OfficeLayout[]> {
   if (!db) throw new Error('Firestore is not initialized.');
   const q = query(
     collection(db, 'layouts'),
@@ -56,39 +56,7 @@ export async function listLayouts(): Promise<OfficeLayout[]> {
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => serializeLayout(d.id, d.data()));
-}*/
-
-
-export async function listPublishedLayouts(): Promise<OfficeLayout[]> {
-  if (!db) {
-    throw new Error('Firestore is not initialized.');
-  }
-
-  try {
-    const q = query(
-      collection(db, 'layouts'),
-      where('status', '==', 'published'),
-    );
-
-    const snap = await getDocs(q);
-
-    console.log(
-      '[listPublishedLayouts] Documents returned:',
-      snap.size,
-      snap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name,
-        status: d.data().status,
-      })),
-    );
-
-    return snap.docs.map((d) => serializeLayout(d.id, d.data()));
-  } catch (error) {
-    console.error('[listPublishedLayouts] Firestore query failed:', error);
-    throw error;
-  }
 }
-//end
 
 export async function getLayout(id: string): Promise<OfficeLayout | null> {
   if (!db) throw new Error('Firestore is not initialized.');
