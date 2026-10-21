@@ -42,19 +42,26 @@ export default function BookSeatPage() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
+  const loadedRef = useRef(false);
   const panStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     (async () => {
       setLoading(true);
       try {
-        const [ls, s] = await Promise.all([listPublishedLayouts(), getSettings()]);
+        const ls = await listPublishedLayouts();
         setLayouts(ls);
-        setSettings(s);
         if (ls.length) setSelectedLayoutId(ls[0].id);
       } catch (err) {
-        console.error(err);
-        show('Could not load floor plans.', 'error');
+        console.error('Failed to load floor plans:', err);
+        show('Could not load floor plans. Please try again.', 'error');
+      }
+      try {
+        setSettings(await getSettings());
+      } catch (err) {
+        console.error('Failed to load settings:', err);
       } finally {
         setLoading(false);
       }

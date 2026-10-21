@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Ban, Loader2, X } from 'lucide-react';
 import DashboardShell from '@/components/DashboardShell';
 import { CardSpinner } from '@/components/Spinner';
@@ -18,9 +18,11 @@ export default function MyBookingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const loadedProfileRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || loadedProfileRef.current === profile.uid) return;
+    loadedProfileRef.current = profile.uid;
     (async () => {
       setLoading(true);
       try {

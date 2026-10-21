@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarCheck,
@@ -21,9 +21,11 @@ export default function EmployeeDashboardPage() {
   const { show } = useToast();
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const loadedProfileRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || loadedProfileRef.current === profile.uid) return;
+    loadedProfileRef.current = profile.uid;
     (async () => {
       setLoading(true);
       try {

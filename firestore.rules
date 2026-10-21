@@ -79,7 +79,8 @@ service cloud.firestore {
     // --- Layouts --------------------------------------------------------
     match /layouts/{layoutId} {
       // Employees can read only published layouts. Admin can read all.
-      allow read: if isAdmin() || (isEmployee() && resource.data.status == 'published');
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.status == 'published');
 
       // Only admin can create/update/delete layouts and image data.
       allow create: if isAdmin();
@@ -89,7 +90,9 @@ service cloud.firestore {
 
       // --- Seats subcollection ------------------------------------------
       match /seats/{seatId} {
-        allow read: if isAdmin() || (isEmployee() && get(/databases/$(database)/documents/layouts/$(layoutId)).data.status == 'published');
+        allow read: if isAdmin()
+          || (isSignedIn()
+            && get(/databases/$(database)/documents/layouts/$(layoutId)).data.status == 'published');
         allow write: if isAdmin();
       }
 
@@ -102,7 +105,7 @@ service cloud.firestore {
     match /bookings/{bookingId} {
       // Employees can read only their own bookings. Admin can read all.
       allow read: if isAdmin()
-        || (isEmployee() && resource.data.employeeId == uid());
+        || (isSignedIn() && resource.data.employeeId == uid());
 
       // An employee may create a booking for themselves only, with status
       // 'active'. The deterministic ID prevents concurrent duplicates:
