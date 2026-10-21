@@ -340,9 +340,13 @@ export default function LayoutEditorPage() {
 
   // Save metadata
   const [meta, setMeta] = useState({ name: '', office: '', floor: '' });
+  const [metaInitialized, setMetaInitialized] = useState(false);
   useEffect(() => {
-    if (layout) setMeta({ name: layout.name, office: layout.office, floor: layout.floor });
-  }, [layout]);
+    if (layout && !metaInitialized) {
+      setMeta({ name: layout.name, office: layout.office, floor: layout.floor });
+      setMetaInitialized(true);
+    }
+  }, [layout, metaInitialized]);
 
   const saveMetadata = async () => {
     try {
@@ -375,6 +379,10 @@ export default function LayoutEditorPage() {
     }
     setSaving(true);
     try {
+      // Persist layout name/office/floor so drafts keep the edited name.
+      await updateLayoutMetadata(layoutId, meta);
+      setLayout((l) => (l ? { ...l, ...meta } : l));
+
       const changes: SeatChange[] = [];
       for (const s of seats) {
         if (s.__isDeleted && !s.__isNew) {

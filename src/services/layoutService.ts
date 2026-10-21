@@ -49,13 +49,14 @@ export async function listLayouts(): Promise<OfficeLayout[]> {
 
 export async function listPublishedLayouts(): Promise<OfficeLayout[]> {
   if (!db) throw new Error('Firestore is not initialized.');
-  const q = query(
-    collection(db, 'layouts'),
-    where('status', '==', 'published'),
-    orderBy('name', 'asc'),
-  );
+  // Avoid the composite-index requirement: filter by status only, sort by
+  // name client-side. Firestore rules already restrict employees to
+  // published layouts, so the bare status query is safe.
+  const q = query(collection(db, 'layouts'), where('status', '==', 'published'));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => serializeLayout(d.id, d.data()));
+  return snap.docs
+    .map((d) => serializeLayout(d.id, d.data()))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getLayout(id: string): Promise<OfficeLayout | null> {
