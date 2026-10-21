@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -93,20 +92,25 @@ export async function listBookingsForEmployee(
   employeeId: string,
 ): Promise<Booking[]> {
   if (!db) throw new Error('Firestore is not initialized.');
+  // Avoid composite-index requirement: filter only, sort client-side.
   const q = query(
     collection(db, 'bookings'),
     where('employeeId', '==', employeeId),
-    orderBy('bookingDate', 'desc'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => serializeBooking(d.id, d.data()));
+  return snap.docs
+    .map((d) => serializeBooking(d.id, d.data()))
+    .sort((a, b) => b.bookingDate.localeCompare(a.bookingDate));
 }
 
 export async function listAllBookings(): Promise<Booking[]> {
   if (!db) throw new Error('Firestore is not initialized.');
-  const q = query(collection(db, 'bookings'), orderBy('bookingDate', 'desc'));
+  // Avoid composite-index requirement: sort client-side.
+  const q = query(collection(db, 'bookings'));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => serializeBooking(d.id, d.data()));
+  return snap.docs
+    .map((d) => serializeBooking(d.id, d.data()))
+    .sort((a, b) => b.bookingDate.localeCompare(a.bookingDate));
 }
 
 export async function listBookingsForDate(
@@ -114,14 +118,15 @@ export async function listBookingsForDate(
   bookingDate: string,
 ): Promise<Booking[]> {
   if (!db) throw new Error('Firestore is not initialized.');
+  // Single filter to avoid composite-index requirements; refine client-side.
   const q = query(
     collection(db, 'bookings'),
     where('layoutId', '==', layoutId),
-    where('bookingDate', '==', bookingDate),
-    where('status', '==', 'active'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => serializeBooking(d.id, d.data()));
+  return snap.docs
+    .map((d) => serializeBooking(d.id, d.data()))
+    .filter((b) => b.bookingDate === bookingDate && b.status === 'active');
 }
 
 export async function cancelBooking(id: string): Promise<void> {
@@ -137,12 +142,17 @@ export async function countBookingsForEmployeeOnDate(
   bookingDate: string,
 ): Promise<number> {
   if (!db) throw new Error('Firestore is not initialized.');
+  // Single filter to avoid composite-index requirements; refine client-side.
   const q = query(
     collection(db, 'bookings'),
     where('employeeId', '==', employeeId),
-    where('bookingDate', '==', bookingDate),
-    where('status', '==', 'active'),
   );
   const snap = await getDocs(q);
-  return snap.size;
+  return snap.docs.filter((d) => {
+    const data = d.data();
+    return (
+      (data.bookingDate as string) === bookingDate &&
+      (data.status as string) === 'active'
+    );
+  }).length;
 }
