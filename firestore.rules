@@ -119,14 +119,30 @@ service cloud.firestore {
         && request.resource.data.status == 'active'
         && request.resource.data.bookingDate is string;
 
-      // Employees may cancel (update status to 'cancelled') their own
-      // bookings. They may not change any other field.
+      // Employees may cancel their own bookings or claim a cancelled
+      // reservation for the same seat and date.
       allow update: if isAdmin()
         || (isEmployee()
-          && resource.data.employeeId == uid()
-          && request.resource.data.employeeId == uid()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && request.resource.data.status == 'cancelled');
+          && request.resource.data.layoutId == resource.data.layoutId
+          && request.resource.data.seatId == resource.data.seatId
+          && request.resource.data.seatCode == resource.data.seatCode
+          && request.resource.data.bookingDate == resource.data.bookingDate
+          && (
+            (
+              resource.data.employeeId == uid()
+              && request.resource.data.employeeId == uid()
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+              && request.resource.data.status == 'cancelled'
+            )
+            || (
+              resource.data.status == 'cancelled'
+              && request.resource.data.employeeId == uid()
+              && request.resource.data.status == 'active'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'employeeId', 'employeeName', 'employeeEmail', 'status', 'updatedAt'
+              ])
+            )
+          ));
 
       // Only admin can delete bookings entirely.
       allow delete: if isAdmin();

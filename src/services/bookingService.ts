@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   updateDoc,
   where,
-  writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 
 /**
@@ -66,15 +66,31 @@ export async function createBooking(
   if (!db) throw new Error('Firestore is not initialized.');
   const id = bookingDocId(input.layoutId, input.seatId, input.bookingDate);
   const ref = doc(db, 'bookings', id);
-  await writeBatch(db)
-    .set(ref, {
+  let error: string | undefined;
+
+  await runTransaction(db, async (transaction) => {
+    const existing = await transaction.get(ref);
+    if (existing.exists() && existing.data().status === 'active') {
+      error = 'This seat is already booked for that date.';
+      return;
+    }
+
+    const bookingData = {
       ...input,
-      status: 'active',
-      createdAt: serverTimestamp(),
+      status: 'active' as const,
       updatedAt: serverTimestamp(),
-    })
-    .commit();
-  return { id };
+    };
+    if (existing.exists()) {
+      transaction.update(ref, bookingData);
+    } else {
+      transaction.set(ref, {
+        ...bookingData,
+        createdAt: serverTimestamp(),
+      });
+    }
+  });
+
+  return { id, error };
 }
 
 export async function getBooking(id: string): Promise<Booking | null> {
