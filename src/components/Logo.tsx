@@ -17,7 +17,7 @@ export default function Logo({
         <Armchair className={iconClass} />
       </div>
       {showText && (
-        <span className="text-lg font-bold tracking-tight text-White-800">
+        <span className="text-lg font-bold tracking-tight text-White-200">
           BookMy<span className="text-indigo-600">Seat</span>
         </span>
       )}
