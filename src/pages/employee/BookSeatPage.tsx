@@ -84,15 +84,17 @@ export default function BookSeatPage() {
   }, [selectedLayoutId, show]);
 
   useEffect(() => {
-    if (!selectedLayoutId) return;
+    if (!selectedLayoutId || !profile?.uid) return;
     (async () => {
       try {
-        setBookingsOnDate(await listBookingsForDate(selectedLayoutId, date));
+        setBookingsOnDate(
+          await listBookingsForDate(selectedLayoutId, date, profile.uid),
+        );
       } catch (err) {
-        console.error(err);
+        console.error('Failed to load bookings for the selected date:', err);
       }
     })();
-  }, [selectedLayoutId, date]);
+  }, [selectedLayoutId, date, profile?.uid]);
 
   const bookedSeatIds = useMemo(
     () => new Set(bookingsOnDate.map((b) => b.seatId)),
@@ -157,7 +159,9 @@ export default function BookSeatPage() {
       } else {
         show(`Seat ${selectedSeat.seatCode} booked for ${formatDate(date)}!`, 'success');
         setSelectedSeat(null);
-        setBookingsOnDate(await listBookingsForDate(selectedLayoutId, date));
+        setBookingsOnDate(
+          await listBookingsForDate(selectedLayoutId, date, profile?.uid),
+        );
       }
     } catch (err) {
       console.error(err);

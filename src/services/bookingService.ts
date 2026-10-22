@@ -66,10 +66,6 @@ export async function createBooking(
   if (!db) throw new Error('Firestore is not initialized.');
   const id = bookingDocId(input.layoutId, input.seatId, input.bookingDate);
   const ref = doc(db, 'bookings', id);
-  const existing = await getDoc(ref);
-  if (existing.exists() && existing.data()?.status === 'active') {
-    return { id, error: 'This seat is already booked for that date.' };
-  }
   await writeBatch(db)
     .set(ref, {
       ...input,
@@ -116,13 +112,13 @@ export async function listAllBookings(): Promise<Booking[]> {
 export async function listBookingsForDate(
   layoutId: string,
   bookingDate: string,
+  employeeId?: string,
 ): Promise<Booking[]> {
   if (!db) throw new Error('Firestore is not initialized.');
-  // Single filter to avoid composite-index requirements; refine client-side.
-  const q = query(
-    collection(db, 'bookings'),
-    where('layoutId', '==', layoutId),
-  );
+  // Employees may only query their own bookings; admins query by layout.
+  const q = employeeId
+    ? query(collection(db, 'bookings'), where('employeeId', '==', employeeId))
+    : query(collection(db, 'bookings'), where('layoutId', '==', layoutId));
   const snap = await getDocs(q);
   return snap.docs
     .map((d) => serializeBooking(d.id, d.data()))

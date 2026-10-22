@@ -124,7 +124,10 @@ service cloud.firestore {
           && resource.data.employeeId == uid()
           && request.resource.data.employeeId == uid()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && request.resource.data.status == 'cancelled');
+          && (
+            request.resource.data.status == 'cancelled'
+            || (resource.data.status == 'cancelled' && request.resource.data.status == 'active')
+          ));
 
       // Only admin can delete bookings entirely.
       allow delete: if isAdmin();
