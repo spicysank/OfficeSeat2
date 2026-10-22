@@ -133,7 +133,7 @@ export default function SignupPage() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg ring-1 ring-gray-200">
           <div className="mb-6 flex justify-center">
-            <Logo className="h-10 w-40" />
+            <Logo />
           </div>
           <div className="flex flex-col items-center text-center">
             <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100">
@@ -184,7 +184,7 @@ export default function SignupPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 lg:flex-row">
       <div className="relative hidden flex-1 bg-gradient-to-br from-indigo-700 via-navy-700 to-navy-800 lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <Logo className="h-12 w-40" />
+        <Logo dark />
         <div className="text-white">
           <h2 className="text-3xl font-bold leading-tight">
             Find your seat.<br />Plan your day.
@@ -202,7 +202,7 @@ export default function SignupPage() {
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="mb-8 flex justify-center lg:hidden">
-            <Logo className="h-10 w-40" />
+            <Logo />
           </div>
           <h1 className="text-2xl font-bold text-navy-800">Create your account</h1>
           <p className="mt-1 text-sm text-gray-500">

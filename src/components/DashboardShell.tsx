@@ -81,7 +81,7 @@ export default function DashboardShell({
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-navy-800 text-white lg:flex">
         <div className="flex h-16 items-center px-6">
           <Link to={isAdmin ? '/admin/dashboard' : '/employee/dashboard'}>
-            <Logo />
+            <Logo dark />
           </Link>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
@@ -120,7 +120,7 @@ export default function DashboardShell({
           />
           <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-navy-800 text-white animate-[slideIn_0.2s_ease-out]">
             <div className="flex h-16 items-center justify-between px-6">
-              <Logo />
+              <Logo dark />
               <button onClick={() => setMobileOpen(false)}>
                 <X className="h-5 w-5" />
               </button>
