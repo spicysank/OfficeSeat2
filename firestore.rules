@@ -41,7 +41,9 @@ service cloud.firestore {
     }
 
     function isEmployee() {
-      return isSignedIn() && !isAdmin();
+      return isSignedIn()
+        && get(/databases/$(database)/documents/users/$(uid())).data.role == 'employee'
+        && get(/databases/$(database)/documents/users/$(uid())).data.active == true;
     }
 
     function userIsActive() {
