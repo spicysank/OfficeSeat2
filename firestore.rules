@@ -37,7 +37,7 @@ service cloud.firestore {
       return isSignedIn()
         && (request.auth.token.admin == true
           || (isReserveAdminEmail()
-            && exists(/databases/$(database)/documents/users/$(uid())).data.role == 'admin'));
+            && get(/databases/$(database)/documents/users/$(uid())).data.role == 'admin'));
     }
 
     function isEmployee() {
@@ -85,7 +85,8 @@ service cloud.firestore {
       // Only admin can create/update/delete layouts and image data.
       allow create: if isAdmin();
       allow update: if isAdmin()
-        && request.resource.data.size < 1048576;
+        && request.resource.data.imageBase64 is string
+        && request.resource.data.imageBase64.size() <= 700000;
       allow delete: if isAdmin();
 
       // --- Seats subcollection ------------------------------------------
