@@ -152,7 +152,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col bg-slate-50 lg:flex-row">
       {/* Left brand panel */}
       <div className="relative hidden flex-1 bg-gradient-to-br from-navy-800 via-navy-700 to-indigo-700 lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <Logo className="h-11 w-11" iconClass="h-6 w-6" />
+        <Logo className="h-12 w-40" />
         <div className="text-white">
           <h2 className="text-3xl font-bold leading-tight">
             Your Workspace.<br />Your Seat.<br />Your Choice.
@@ -171,7 +171,7 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="mb-8 flex justify-center lg:hidden">
-            <Logo />
+            <Logo className="h-10 w-40" />
           </div>
           <h1 className="text-2xl font-bold text-navy-800">Sign in</h1>
           <p className="mt-1 text-sm text-gray-500">

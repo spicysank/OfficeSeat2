@@ -1,26 +1,17 @@
-import { Armchair } from 'lucide-react';
-
 export default function Logo({
-  className = 'h-9 w-9',
-  iconClass = 'h-5 w-5',
-  showText = true,
+  className = 'h-9 w-36',
 }: {
   className?: string;
-  iconClass?: string;
-  showText?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div
-        className={`flex ${className} items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-navy-700 text-white shadow-md`}
-      >
-        <Armchair className={iconClass} />
-      </div>
-      {showText && (
-        <span className="text-lg font-bold tracking-tight text-navy-300">
-          BookMy<span className="text-indigo-600">Seat</span>
-        </span>
-      )}
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-lg bg-white px-2 py-1 shadow-sm ${className}`}
+    >
+      <img
+        src="/assets/image copy.png"
+        alt="HOERBIGER"
+        className="h-full w-full object-contain"
+      />
     </div>
   );
 }
