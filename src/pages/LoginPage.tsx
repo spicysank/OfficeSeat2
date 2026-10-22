@@ -268,7 +268,7 @@ export default function LoginPage() {
           </form>
 
           {/* Admin demo section */}
-          <div className="mt-6 rounded-lg border border-gray-200 bg-slate-50">
+          {/* <div className="mt-6 rounded-lg border border-gray-200 bg-slate-50">
             <button
               type="button"
               onClick={() => setAdminSectionOpen((v) => !v)}
@@ -300,7 +300,7 @@ export default function LoginPage() {
                 </button>
               </div>
             )}
-          </div>
+          </div> */}
 
           <p className="mt-6 text-center text-sm text-gray-600">
             Don't have an account?{' '}
