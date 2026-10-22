@@ -106,9 +106,9 @@ service cloud.firestore {
 
     // --- Bookings --------------------------------------------------------
     match /bookings/{bookingId} {
-      // Employees can read only their own bookings. Admin can read all.
-      allow read: if isAdmin()
-        || (isSignedIn() && resource.data.employeeId == uid());
+      // All signed-in users can read bookings (employees need to see which
+      // seats are taken on a given date to display the floor plan correctly).
+      allow read: if isSignedIn();
 
       // An employee may create a booking for themselves only, with status
       // 'active'. The deterministic ID prevents concurrent duplicates:
@@ -126,10 +126,7 @@ service cloud.firestore {
           && resource.data.employeeId == uid()
           && request.resource.data.employeeId == uid()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && (
-            request.resource.data.status == 'cancelled'
-            || (resource.data.status == 'cancelled' && request.resource.data.status == 'active')
-          ));
+          && request.resource.data.status == 'cancelled');
 
       // Only admin can delete bookings entirely.
       allow delete: if isAdmin();

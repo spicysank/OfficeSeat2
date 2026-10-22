@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
   Armchair,
-  Loader2,
-  Check,
-  X,
   ZoomIn,
   ZoomOut,
   Maximize,
   Info,
+  X,
+  Ban,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import DashboardShell from '@/components/DashboardShell';
 import { CardSpinner } from '@/components/Spinner';
@@ -20,11 +21,17 @@ import { listSeats } from '@/services/seatService';
 import {
   createBooking,
   listBookingsForDate,
+  cancelBooking,
   countBookingsForEmployeeOnDate,
 } from '@/services/bookingService';
 import { getSettings } from '@/services/settingsService';
 import { todayISO, addDays, formatDate, parseISO } from '@/lib/date';
 import type { OfficeLayout, Seat, Booking, AppSettings } from '@/types';
+
+type SeatPanel =
+  | { kind: 'book'; seat: Seat }
+  | { kind: 'booked'; seat: Seat }
+  | { kind: 'mine'; seat: Seat; booking: Booking };
 
 export default function BookSeatPage() {
   const { profile } = useAuth();
@@ -36,8 +43,8 @@ export default function BookSeatPage() {
   const [bookingsOnDate, setBookingsOnDate] = useState<Booking[]>([]);
   const [date, setDate] = useState(todayISO());
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
-  const [booking, setBooking] = useState(false);
+  const [panel, setPanel] = useState<SeatPanel | null>(null);
+  const [acting, setActing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
@@ -83,18 +90,19 @@ export default function BookSeatPage() {
     })();
   }, [selectedLayoutId, show]);
 
+  const refreshBookings = async (layoutId: string, d: string) => {
+    try {
+      setBookingsOnDate(await listBookingsForDate(layoutId, d));
+    } catch (err) {
+      console.error('Failed to load bookings for date:', err);
+    }
+  };
+
   useEffect(() => {
-    if (!selectedLayoutId || !profile?.uid) return;
-    (async () => {
-      try {
-        setBookingsOnDate(
-          await listBookingsForDate(selectedLayoutId, date, profile.uid),
-        );
-      } catch (err) {
-        console.error('Failed to load bookings for the selected date:', err);
-      }
-    })();
-  }, [selectedLayoutId, date, profile?.uid]);
+    if (!selectedLayoutId) return;
+    refreshBookings(selectedLayoutId, date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLayoutId, date]);
 
   const bookedSeatIds = useMemo(
     () => new Set(bookingsOnDate.map((b) => b.seatId)),
@@ -124,23 +132,38 @@ export default function BookSeatPage() {
     return 'available';
   };
 
+  const handleSeatClick = (s: Seat) => {
+    const status = seatStatus(s);
+    if (status === 'disabled' || !dateValid) return;
+    if (status === 'available') {
+      setPanel({ kind: 'book', seat: s });
+    } else if (status === 'booked') {
+      setPanel({ kind: 'booked', seat: s });
+    } else if (status === 'mine') {
+      const booking = bookingsOnDate.find(
+        (b) => b.seatId === s.id && b.employeeId === profile?.uid,
+      );
+      if (booking) setPanel({ kind: 'mine', seat: s, booking });
+    }
+  };
+
   const handleConfirmBooking = async () => {
-    if (!selectedSeat || !profile || !selectedLayoutId) return;
+    if (panel?.kind !== 'book' || !profile || !selectedLayoutId) return;
+    const { seat } = panel;
     if (!dateValid) {
       show('That date is not available for booking.', 'error');
       return;
     }
-    setBooking(true);
+    setActing(true);
     try {
       if (settings) {
         const count = await countBookingsForEmployeeOnDate(profile.uid, date);
         if (count >= settings.maxBookingsPerDay) {
           show(
-            `You’ve reached the maximum of ${settings.maxBookingsPerDay} booking(s) for this day.`,
+            `You've reached the maximum of ${settings.maxBookingsPerDay} booking(s) for this day.`,
             'error',
           );
-          setBooking(false);
-          setSelectedSeat(null);
+          setPanel(null);
           return;
         }
       }
@@ -149,25 +172,40 @@ export default function BookSeatPage() {
         employeeName: profile.displayName,
         employeeEmail: profile.email,
         layoutId: selectedLayoutId,
-        seatId: selectedSeat.id,
-        seatCode: selectedSeat.seatCode,
+        seatId: seat.id,
+        seatCode: seat.seatCode,
         bookingDate: date,
       });
       if (result.error) {
         show(result.error, 'error');
-        setSelectedSeat(null);
+        setPanel(null);
       } else {
-        show(`Seat ${selectedSeat.seatCode} booked for ${formatDate(date)}!`, 'success');
-        setSelectedSeat(null);
-        setBookingsOnDate(
-          await listBookingsForDate(selectedLayoutId, date, profile?.uid),
-        );
+        show(`Seat ${seat.seatCode} booked for ${formatDate(date)}!`, 'success');
+        setPanel(null);
+        await refreshBookings(selectedLayoutId, date);
       }
     } catch (err) {
       console.error(err);
       show('Could not complete booking. Please try again.', 'error');
     } finally {
-      setBooking(false);
+      setActing(false);
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    if (panel?.kind !== 'mine' || !selectedLayoutId) return;
+    const { booking } = panel;
+    setActing(true);
+    try {
+      await cancelBooking(booking.id);
+      show('Booking cancelled.', 'success');
+      setPanel(null);
+      await refreshBookings(selectedLayoutId, date);
+    } catch (err) {
+      console.error(err);
+      show('Could not cancel booking.', 'error');
+    } finally {
+      setActing(false);
     }
   };
 
@@ -217,7 +255,7 @@ export default function BookSeatPage() {
           <Armchair className="h-10 w-10 text-gray-400" />
           <h3 className="mt-4 text-lg font-semibold text-navy-800">No floor plans available</h3>
           <p className="mt-1 max-w-sm text-sm text-gray-500">
-            Your administrator hasn’t published any office layouts yet. Check back soon.
+            Your administrator hasn't published any office layouts yet. Check back soon.
           </p>
         </div>
       ) : (
@@ -257,7 +295,7 @@ export default function BookSeatPage() {
             {!dateValid && (
               <p className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
                 <Info className="h-4 w-4" />
-                {isWorkingDay(date) ? 'That date is outside the booking window.' : 'That’s not a working day.'}
+                {isWorkingDay(date) ? 'That date is outside the booking window.' : 'That\u2019s not a working day.'}
               </p>
             )}
             {/* Legend */}
@@ -325,17 +363,20 @@ export default function BookSeatPage() {
                         const status = seatStatus(s);
                         const colors: Record<string, string> = {
                           available: 'bg-emerald-500 text-white hover:scale-110 hover:bg-emerald-600',
-                          booked: 'bg-rose-500 text-white opacity-80',
-                          mine: 'bg-indigo-600 text-white ring-2 ring-indigo-300 ring-offset-2',
+                          booked: 'bg-rose-500 text-white hover:bg-rose-600',
+                          mine: 'bg-indigo-600 text-white ring-2 ring-indigo-300 ring-offset-2 hover:bg-indigo-700',
                           disabled: 'bg-gray-400 text-white opacity-60',
                         };
+                        const clickable =
+                          (status === 'available' || status === 'booked' || status === 'mine') &&
+                          dateValid;
                         return (
                           <button
                             key={s.id}
-                            disabled={status === 'booked' || status === 'disabled' || !dateValid}
+                            disabled={status === 'disabled' || !dateValid}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (status === 'available') setSelectedSeat(s);
+                              handleSeatClick(s);
                             }}
                             className={`absolute flex items-center justify-center rounded-full text-[10px] font-bold shadow-md transition-transform ${colors[status]}`}
                             style={{
@@ -345,8 +386,7 @@ export default function BookSeatPage() {
                               height: `${s.heightPercent}%`,
                               maxWidth: '8%',
                               maxHeight: '8%',
-                              cursor:
-                                status === 'available' && dateValid ? 'pointer' : 'default',
+                              cursor: clickable ? 'pointer' : 'default',
                             }}
                             title={`${s.seatCode} — ${status}`}
                           >
@@ -394,20 +434,21 @@ export default function BookSeatPage() {
         </div>
       )}
 
+      {/* ── Book confirm dialog ── */}
       <ConfirmDialog
-        open={Boolean(selectedSeat)}
+        open={panel?.kind === 'book'}
         title="Confirm your booking"
         message={
-          selectedSeat ? (
+          panel?.kind === 'book' ? (
             <div className="space-y-2">
               <div className="flex items-center gap-3 rounded-lg bg-indigo-50 p-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white">
-                  {selectedSeat.seatCode}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white text-xs">
+                  {panel.seat.seatCode}
                 </span>
                 <div>
-                  <p className="font-semibold text-navy-800">Seat {selectedSeat.seatCode}</p>
-                  {selectedSeat.label && (
-                    <p className="text-xs text-gray-500">{selectedSeat.label}</p>
+                  <p className="font-semibold text-navy-800">Seat {panel.seat.seatCode}</p>
+                  {panel.seat.label && (
+                    <p className="text-xs text-gray-500">{panel.seat.label}</p>
                   )}
                 </div>
               </div>
@@ -422,16 +463,16 @@ export default function BookSeatPage() {
                     {selectedLayout?.office} · {selectedLayout?.floor}
                   </dd>
                 </div>
-                {selectedSeat.zone && (
+                {panel.seat.zone && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Zone</dt>
-                    <dd className="font-medium text-gray-900">{selectedSeat.zone}</dd>
+                    <dd className="font-medium text-gray-900">{panel.seat.zone}</dd>
                   </div>
                 )}
-                {selectedSeat.department && (
+                {panel.seat.department && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Department</dt>
-                    <dd className="font-medium text-gray-900">{selectedSeat.department}</dd>
+                    <dd className="font-medium text-gray-900">{panel.seat.department}</dd>
                   </div>
                 )}
               </dl>
@@ -440,10 +481,89 @@ export default function BookSeatPage() {
             ''
           )
         }
-        confirmLabel={booking ? 'Booking…' : 'Confirm booking'}
+        confirmLabel={acting ? 'Booking…' : 'Confirm booking'}
         onConfirm={handleConfirmBooking}
-        onCancel={() => setSelectedSeat(null)}
+        onCancel={() => setPanel(null)}
       />
+
+      {/* ── Seat already booked info dialog ── */}
+      {panel?.kind === 'booked' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                <Ban className="h-5 w-5 text-rose-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900">Seat already booked</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Seat <strong>{panel.seat.seatCode}</strong> is already reserved for{' '}
+                  <strong>{formatDate(date)}</strong>. Please choose another available seat.
+                </p>
+              </div>
+              <button
+                onClick={() => setPanel(null)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              onClick={() => setPanel(null)}
+              className="mt-5 w-full rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel my booking dialog ── */}
+      {panel?.kind === 'mine' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100">
+                <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900">Your booking</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  You have seat <strong>{panel.seat.seatCode}</strong> booked for{' '}
+                  <strong>{formatDate(date)}</strong>.
+                </p>
+              </div>
+              <button
+                onClick={() => setPanel(null)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-1 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p className="text-xs text-amber-700">
+                Cancelling will release this seat and cannot be undone.
+              </p>
+            </div>
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={() => setPanel(null)}
+                className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Keep it
+              </button>
+              <button
+                disabled={acting}
+                onClick={handleCancelBooking}
+                className="flex-1 rounded-lg bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+              >
+                {acting ? 'Cancelling…' : 'Cancel booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardShell>
   );
 }

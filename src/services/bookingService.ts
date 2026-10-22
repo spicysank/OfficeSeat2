@@ -112,13 +112,12 @@ export async function listAllBookings(): Promise<Booking[]> {
 export async function listBookingsForDate(
   layoutId: string,
   bookingDate: string,
-  employeeId?: string,
 ): Promise<Booking[]> {
   if (!db) throw new Error('Firestore is not initialized.');
-  // Employees may only query their own bookings; admins query by layout.
-  const q = employeeId
-    ? query(collection(db, 'bookings'), where('employeeId', '==', employeeId))
-    : query(collection(db, 'bookings'), where('layoutId', '==', layoutId));
+  const q = query(
+    collection(db, 'bookings'),
+    where('layoutId', '==', layoutId),
+  );
   const snap = await getDocs(q);
   return snap.docs
     .map((d) => serializeBooking(d.id, d.data()))
