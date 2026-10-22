@@ -30,7 +30,15 @@ export function friendlyAuthError(code: string | undefined): string {
     'auth/network-request-failed':
       'Network error. Check your connection and try again.',
     'auth/operation-not-allowed':
-      'Email/password sign-in is not enabled for this project.',
+      'This sign-in method is not enabled in Firebase Authentication.',
+    'auth/unauthorized-domain':
+      'Google sign-in is not enabled for this website yet. Add this website domain in Firebase Authentication settings.',
+    'auth/configuration-not-found':
+      'Firebase Authentication is not configured for Google sign-in yet.',
+    'auth/app-not-authorized':
+      'This app is not authorized to use the Firebase project.',
+    'auth/invalid-api-key':
+      'The Firebase web app configuration is invalid.',
     'auth/requires-recent-login':
       'Please sign out and sign back in, then try again.',
     'auth/popup-closed-by-user':
@@ -41,6 +49,12 @@ export function friendlyAuthError(code: string | undefined): string {
       'The sign-in popup was blocked by your browser. Please allow popups for this site.',
     'auth/operation-not-supported-in-this-environment':
       'This sign-in method is not supported in this environment.',
+    'auth/account-exists-with-different-credential':
+      'An account already exists with this email using a different sign-in method.',
+    'permission-denied':
+      'Google sign-in succeeded, but your account profile could not be created. Check the Firestore rules.',
+    'failed-precondition':
+      'Google sign-in succeeded, but Firebase could not finish creating your account profile.',
   };
   return (code && map[code]) || 'Something went wrong. Please try again.';
 }

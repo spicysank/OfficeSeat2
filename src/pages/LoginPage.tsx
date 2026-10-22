@@ -117,7 +117,9 @@ export default function LoginPage() {
         return;
       }
       show('Welcome back!', 'success');
-      navigate('/employee/dashboard', { replace: true });
+      navigate(profile.role === 'admin' ? '/admin/dashboard' : '/employee/dashboard', {
+        replace: true,
+      });
     } catch (err) {
       const e = err as { code?: string };
       show(friendlyAuthError(e.code), 'error');
@@ -135,7 +137,9 @@ export default function LoginPage() {
         return;
       }
       show('Welcome back!', 'success');
-      navigate('/employee/dashboard', { replace: true });
+      navigate(profile.role === 'admin' ? '/admin/dashboard' : '/employee/dashboard', {
+        replace: true,
+      });
     } catch (err) {
       const e = err as { code?: string };
       show(friendlyAuthError(e.code), 'error');
