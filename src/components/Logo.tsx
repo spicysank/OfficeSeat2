@@ -18,7 +18,7 @@ export default function Logo({
       </div>
       {showText && (
         <span className="text-lg font-bold tracking-tight text-navy-800">
-          Office<span className="text-indigo-600">Seat</span>
+          BookMy<span className="text-indigo-600">Seat</span>
         </span>
       )}
     </div>
