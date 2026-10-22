@@ -5,10 +5,15 @@ import type { UserProfile } from '@/types';
 import {
   createUserWithEmailAndPassword,
   getIdTokenResult,
+  GoogleAuthProvider,
+  OAuthProvider,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
+  type User,
 } from 'firebase/auth';
 
 export function friendlyAuthError(code: string | undefined): string {
@@ -28,6 +33,14 @@ export function friendlyAuthError(code: string | undefined): string {
       'Email/password sign-in is not enabled for this project.',
     'auth/requires-recent-login':
       'Please sign out and sign back in, then try again.',
+    'auth/popup-closed-by-user':
+      'The sign-in popup was closed before completing. Please try again.',
+    'auth/cancelled-popup-request':
+      'The sign-in popup was cancelled. Please try again.',
+    'auth/popup-blocked':
+      'The sign-in popup was blocked by your browser. Please allow popups for this site.',
+    'auth/operation-not-supported-in-this-environment':
+      'This sign-in method is not supported in this environment.',
   };
   return (code && map[code]) || 'Something went wrong. Please try again.';
 }
@@ -35,7 +48,7 @@ export function friendlyAuthError(code: string | undefined): string {
 export async function signIn(
   email: string,
   password: string,
-): Promise<{ user: import('firebase/auth').User; profile: UserProfile }> {
+): Promise<{ user: User; profile: UserProfile }> {
   if (!auth) throw new Error('Firebase Auth is not initialized.');
   const cred = await signInWithEmailAndPassword(auth, email, password);
   const profile = await ensureUserProfile(
@@ -46,11 +59,35 @@ export async function signIn(
   return { user: cred.user, profile };
 }
 
+export async function signInWithGoogle(): Promise<{ user: User; profile: UserProfile }> {
+  if (!auth) throw new Error('Firebase Auth is not initialized.');
+  const provider = new GoogleAuthProvider();
+  const cred = await signInWithPopup(auth, provider);
+  const profile = await ensureUserProfile(
+    cred.user.uid,
+    cred.user.email || '',
+    cred.user.displayName || (cred.user.email ? cred.user.email.split('@')[0] : 'Employee'),
+  );
+  return { user: cred.user, profile };
+}
+
+export async function signInWithMicrosoft(): Promise<{ user: User; profile: UserProfile }> {
+  if (!auth) throw new Error('Firebase Auth is not initialized.');
+  const provider = new OAuthProvider('microsoft.com');
+  const cred = await signInWithPopup(auth, provider);
+  const profile = await ensureUserProfile(
+    cred.user.uid,
+    cred.user.email || '',
+    cred.user.displayName || (cred.user.email ? cred.user.email.split('@')[0] : 'Employee'),
+  );
+  return { user: cred.user, profile };
+}
+
 export async function register(
   displayName: string,
   email: string,
   password: string,
-): Promise<{ user: import('firebase/auth').User; profile: UserProfile }> {
+): Promise<{ user: User; profile: UserProfile }> {
   if (!auth) throw new Error('Firebase Auth is not initialized.');
   const normalized = normalizeEmail(email);
   if (isAdminEmail(normalized)) {
@@ -65,7 +102,14 @@ export async function register(
     normalized,
     displayName,
   );
+  await sendEmailVerification(cred.user);
   return { user: cred.user, profile };
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  if (!auth) throw new Error('Firebase Auth is not initialized.');
+  if (!auth.currentUser) throw new Error('No user is currently signed in.');
+  await sendEmailVerification(auth.currentUser);
 }
 
 export async function resetPassword(email: string): Promise<void> {

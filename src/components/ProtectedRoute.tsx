@@ -2,10 +2,11 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { FullPageSpinner } from '@/components/Spinner';
 import Logo from '@/components/Logo';
+import EmailVerificationGate from '@/components/EmailVerificationGate';
 import { isFirebaseConfigured } from '@/lib/firebase';
 
 export function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
-  const { user, isAdmin, loading, configError } = useAuth();
+  const { user, isAdmin, loading, configError, needsEmailVerification } = useAuth();
   const location = useLocation();
 
   if (configError) {
@@ -16,6 +17,10 @@ export function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (needsEmailVerification) {
+    return <EmailVerificationGate />;
   }
 
   if (adminOnly && !isAdmin) {

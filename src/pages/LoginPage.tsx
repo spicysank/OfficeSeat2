@@ -3,11 +3,16 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, ChevronDown, Loader2, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, ChevronDown, Loader as Loader2, Mail, Lock } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
-import { signIn, friendlyAuthError } from '@/services/authService';
+import {
+  signIn,
+  signInWithGoogle,
+  signInWithMicrosoft,
+  friendlyAuthError,
+} from '@/services/authService';
 import { FullPageSpinner } from '@/components/Spinner';
 
 const schema = z.object({
@@ -17,13 +22,48 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+function GoogleIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1Z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38Z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
+function MicrosoftIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="2" width="9" height="9" fill="#F25022" />
+      <rect x="13" y="2" width="9" height="9" fill="#7FBA00" />
+      <rect x="2" y="13" width="9" height="9" fill="#00A4EF" />
+      <rect x="13" y="13" width="9" height="9" fill="#FFB900" />
+    </svg>
+  );
+}
+
 export default function LoginPage() {
-  const { user, isAdmin, loading, configError } = useAuth();
+  const { user, isAdmin, loading, configError, needsEmailVerification } = useAuth();
   const { show } = useToast();
   const navigate = useNavigate();
   const [showPwd, setShowPwd] = useState(false);
   const [adminSectionOpen, setAdminSectionOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'microsoft' | null>(null);
 
   const {
     register,
@@ -38,7 +78,8 @@ export default function LoginPage() {
 
   if (loading) return <FullPageSpinner label="Loading…" />;
   if (configError) return <Navigate to="/login" replace />;
-  if (user) return <Navigate to={isAdmin ? '/admin/dashboard' : '/employee/dashboard'} replace />;
+  if (user && !needsEmailVerification)
+    return <Navigate to={isAdmin ? '/admin/dashboard' : '/employee/dashboard'} replace />;
 
   const email = watch('email');
 
@@ -64,6 +105,42 @@ export default function LoginPage() {
       show(friendlyAuthError(e.code), 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setSocialLoading('google');
+    try {
+      const { profile } = await signInWithGoogle();
+      if (!profile?.active) {
+        show('This account has been disabled. Contact your administrator.', 'error');
+        return;
+      }
+      show('Welcome back!', 'success');
+      navigate('/employee/dashboard', { replace: true });
+    } catch (err) {
+      const e = err as { code?: string };
+      show(friendlyAuthError(e.code), 'error');
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleMicrosoft = async () => {
+    setSocialLoading('microsoft');
+    try {
+      const { profile } = await signInWithMicrosoft();
+      if (!profile?.active) {
+        show('This account has been disabled. Contact your administrator.', 'error');
+        return;
+      }
+      show('Welcome back!', 'success');
+      navigate('/employee/dashboard', { replace: true });
+    } catch (err) {
+      const e = err as { code?: string };
+      show(friendlyAuthError(e.code), 'error');
+    } finally {
+      setSocialLoading(null);
     }
   };
 
@@ -97,7 +174,44 @@ export default function LoginPage() {
             Welcome back. Sign in to manage your seats.
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+          {/* Social sign-in buttons */}
+          <div className="mt-6 space-y-3">
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={socialLoading !== null || submitting}
+              className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+            >
+              {socialLoading === 'google' ? (
+                <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+              ) : (
+                <GoogleIcon />
+              )}
+              {socialLoading === 'google' ? 'Connecting…' : 'Continue with Google'}
+            </button>
+            <button
+              type="button"
+              onClick={handleMicrosoft}
+              disabled={socialLoading !== null || submitting}
+              className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+            >
+              {socialLoading === 'microsoft' ? (
+                <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+              ) : (
+                <MicrosoftIcon />
+              )}
+              {socialLoading === 'microsoft' ? 'Connecting…' : 'Continue with Microsoft'}
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs font-medium uppercase text-gray-400">or</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Field label="Email" error={errors.email?.message}>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -141,7 +255,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || socialLoading !== null}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -185,7 +299,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-600">
-            Don’t have an account?{' '}
+            Don't have an account?{' '}
             <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-700">
               Create one
             </Link>
